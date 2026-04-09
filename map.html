@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#6C5CE7">
+  <link rel="manifest" href="manifest.json">
+  <title>樂點城市冒險</title>
+  <link rel="stylesheet" href="css/common.css">
+  <style>
+    .map-view { position:relative; width:100%; height:calc(100vh - 120px); overflow:hidden; background:#e8e8e8; }
+    .map-canvas-wrap { width:100%; height:100%; overflow:auto; -webkit-overflow-scrolling:touch; }
+    .map-inner { position:relative; width:600px; height:600px; background:linear-gradient(135deg,#f5f5f5,#e0e0e0); }
+    .game-pin { position:absolute; width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 4px 12px rgba(0,0,0,0.2); cursor:pointer; transform:translate(-50%,-50%); transition:all 0.3s; z-index:5; }
+    .game-pin.locked { background:#bdbdbd; filter:grayscale(1); }
+    .game-pin.unlocked { background:white; animation:pulse 2s infinite; }
+    .game-pin.completed { background:#e8f5e9; }
+    .player-dot { position:absolute; width:16px; height:16px; background:#6C5CE7; border-radius:50%; border:2px solid white; transform:translate(-50%,-50%); z-index:10; box-shadow:0 2px 8px rgba(108,92,231,0.4); }
+    .player-dot::after { content:''; position:absolute; width:32px; height:32px; border-radius:50%; background:rgba(108,92,231,0.15); top:-10px; left:-10px; animation:pulse 2s infinite; }
+    .team-member-dot { position:absolute; width:10px; height:10px; background:#a29bfe; border-radius:50%; border:1.5px solid white; transform:translate(-50%,-50%); z-index:4; }
+    .gps-status { position:absolute; top:56px; right:12px; padding:6px 10px; border-radius:20px; font-size:11px; background:rgba(0,0,0,0.6); color:white; z-index:8; }
+    .distance-badge { font-size:10px; color:white; background:rgba(0,0,0,0.5); padding:2px 6px; border-radius:8px; position:absolute; bottom:-16px; left:50%; transform:translateX(-50%); white-space:nowrap; }
+
+    /* 遊戲列表 tab */
+    .game-list { display:none; padding:16px; }
+    .game-card { display:flex; align-items:center; gap:14px; padding:16px; background:white; border-radius:16px; margin-bottom:12px; box-shadow:var(--shadow); }
+    .game-card-icon { font-size:36px; width:56px; height:56px; border-radius:14px; display:flex; align-items:center; justify-content:center; }
+    .game-card-info { flex:1; }
+    .game-card-name { font-size:15px; font-weight:700; }
+    .game-card-desc { font-size:12px; color:var(--text-light); margin-top:2px; }
+    .game-card-status { font-size:12px; margin-top:4px; font-weight:600; }
+
+    /* 任務 tab */
+    .task-list { display:none; padding:16px; }
+    .task-item { display:flex; align-items:center; gap:12px; padding:14px; background:white; border-radius:12px; margin-bottom:10px; box-shadow:var(--shadow); }
+    .task-status-icon { font-size:20px; }
+    .task-info { flex:1; }
+    .task-name { font-size:14px; font-weight:600; }
+    .task-meta { font-size:11px; color:var(--text-light); margin-top:2px; }
+
+    /* 聊天 */
+    .chat-fab { position:fixed; bottom:80px; right:16px; width:52px; height:52px; border-radius:50%; background:var(--primary); color:white; border:none; font-size:24px; box-shadow:0 4px 16px rgba(108,92,231,0.4); cursor:pointer; z-index:20; }
+    .chat-panel { position:fixed; bottom:0; left:0; right:0; height:60vh; background:white; border-radius:20px 20px 0 0; box-shadow:0 -4px 20px rgba(0,0,0,0.15); z-index:100; transform:translateY(100%); transition:transform 0.3s ease; display:flex; flex-direction:column; }
+    .chat-panel.open { transform:translateY(0); }
+    .chat-header { padding:12px 16px; border-bottom:1px solid #f0f0f0; display:flex; align-items:center; gap:8px; }
+    .chat-ch-btn { padding:6px 14px; border-radius:20px; border:1.5px solid #e0e0e0; background:white; font-size:13px; cursor:pointer; font-weight:600; }
+    .chat-ch-btn.active { background:var(--primary); color:white; border-color:var(--primary); }
+    .chat-messages { flex:1; overflow-y:auto; padding:12px 16px; }
+    .chat-msg { margin-bottom:10px; }
+    .chat-msg-me { text-align:right; }
+    .chat-msg-head { font-size:11px; color:#999; margin-bottom:2px; }
+    .chat-msg-body { display:inline-block; padding:8px 14px; border-radius:16px; background:#f0f0f0; font-size:14px; max-width:80%; text-align:left; word-break:break-word; }
+    .chat-msg-me .chat-msg-body { background:var(--primary); color:white; }
+    .chat-input-bar { display:flex; gap:8px; padding:10px 16px; border-top:1px solid #f0f0f0; }
+    .chat-input-bar input { flex:1; border:1.5px solid #e0e0e0; border-radius:20px; padding:8px 16px; font-size:14px; outline:none; }
+    .chat-input-bar button { background:var(--primary); color:white; border:none; border-radius:50%; width:38px; height:38px; font-size:16px; cursor:pointer; }
+
+    /* Tab Bar */
+    .tab-bar { position:fixed; bottom:0; left:0; right:0; display:flex; background:white; border-top:1px solid #eee; z-index:50; padding-bottom:env(safe-area-inset-bottom); }
+    .tab-item { flex:1; text-align:center; padding:8px 0; cursor:pointer; }
+    .tab-item-icon { font-size:20px; }
+    .tab-item-label { font-size:10px; color:var(--text-light); margin-top:2px; }
+    .tab-item.active .tab-item-label { color:var(--primary); font-weight:700; }
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <button class="top-bar-back" onclick="showSettings()" style="font-size:18px">⚙️</button>
+  <div class="top-bar-title">🏙️ 樂點城市冒險</div>
+  <button style="width:40px;background:none;border:none;font-size:18px;cursor:pointer;position:relative;" onclick="Broadcast.openMessages()">
+    🔔<span id="broadcast-badge" style="display:none;position:absolute;top:2px;right:2px;background:#f44336;color:white;border-radius:50%;width:16px;height:16px;font-size:10px;align-items:center;justify-content:center;">0</span>
+  </button>
+</div>
+
+<div id="notification-bar" class="notification-bar"></div>
+<div id="message-panel" class="message-panel"></div>
+
+<!-- 地圖 view -->
+<div class="map-view" id="mapView">
+  <div class="map-canvas-wrap" id="mapWrap">
+    <div class="map-inner" id="mapInner"></div>
+  </div>
+  <div class="gps-status" id="gpsStatus">📡 定位中...</div>
+</div>
+
+<!-- 遊戲列表 -->
+<div class="game-list page-container" id="gameListView"></div>
+
+<!-- 任務列表 -->
+<div class="task-list page-container" id="taskListView"></div>
+
+<!-- 聊天 FAB -->
+<button class="chat-fab" id="chatFab" onclick="Chat.open()">💬</button>
+
+<!-- 聊天面板 -->
+<div class="chat-panel" id="chat-panel">
+  <div class="chat-header">
+    <button class="chat-ch-btn active" data-channel="team" onclick="Chat.switchChannel('team')">👥 隊伍</button>
+    <button class="chat-ch-btn" data-channel="world" onclick="Chat.switchChannel('world')">🌍 世界</button>
+    <div style="flex:1"></div>
+    <button onclick="Chat.close()" style="background:none;border:none;font-size:18px;cursor:pointer;">✕</button>
+  </div>
+  <div class="chat-messages" id="chat-messages"></div>
+  <div class="chat-input-bar">
+    <input id="chat-input" placeholder="輸入訊息..." maxlength="200">
+    <button onclick="sendChat()">➤</button>
+  </div>
+</div>
+
+<!-- Tab Bar -->
+<div class="tab-bar">
+  <div class="tab-item active" onclick="switchTab('map')"><div class="tab-item-icon">🗺️</div><div class="tab-item-label">地圖</div></div>
+  <div class="tab-item" onclick="switchTab('games')"><div class="tab-item-icon">🎮</div><div class="tab-item-label">遊戲</div></div>
+  <div class="tab-item" onclick="switchTab('tasks')"><div class="tab-item-icon">📋</div><div class="tab-item-label">任務</div></div>
+  <div class="tab-item" onclick="switchTab('scoreboard')"><div class="tab-item-icon">🏆</div><div class="tab-item-label">排行</div></div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/gps.js"></script>
+<script src="js/broadcast.js"></script>
+<script src="js/chat.js"></script>
+<script>
+  if (!Auth.requireLogin()) throw new Error('未登入');
+  AudioEngine.init(); API.init(); Broadcast.init(); Chat.init();
+
+  const session = Auth.getSession();
+  const unlocks = JSON.parse(localStorage.getItem('lepoint_unlocks') || '{}');
+
+  // ===== 地圖座標轉換 =====
+  const MAP_BOUNDS = {
+    north: 25.00720, south: 25.00620,
+    west: 121.20230, east: 121.20310
+  };
+  const mapInner = document.getElementById('mapInner');
+
+  function gpsToPixel(lat, lng) {
+    const x = (lng - MAP_BOUNDS.west) / (MAP_BOUNDS.east - MAP_BOUNDS.west) * 600;
+    const y = (MAP_BOUNDS.north - lat) / (MAP_BOUNDS.north - MAP_BOUNDS.south) * 600;
+    return { x: Math.max(24, Math.min(576, x)), y: Math.max(24, Math.min(576, y)) };
+  }
+
+  // 繪製遊戲圖釘
+  CONFIG.GAMES.forEach(g => {
+    const pos = gpsToPixel(g.location.lat, g.location.lng);
+    const isUnlocked = TEST_MODE || unlocks[g.id];
+    const pin = document.createElement('div');
+    pin.className = `game-pin ${isUnlocked ? 'unlocked' : 'locked'}`;
+    pin.style.left = pos.x + 'px';
+    pin.style.top = pos.y + 'px';
+    pin.style.background = isUnlocked ? g.color : '';
+    pin.innerHTML = isUnlocked ? g.icon : '🔒';
+    pin.onclick = () => {
+      if (isUnlocked || TEST_MODE) {
+        window.location.href = `game.html?id=${g.id}`;
+      } else {
+        alert(`${g.icon} ${g.name}\n需要走到定點 ${CONFIG.GPS.unlockRadius}m 內解鎖`);
+      }
+    };
+    const distBadge = document.createElement('div');
+    distBadge.className = 'distance-badge';
+    distBadge.id = `dist-${g.id}`;
+    distBadge.textContent = '--';
+    pin.appendChild(distBadge);
+    mapInner.appendChild(pin);
+  });
+
+  // 玩家點
+  const playerDot = document.createElement('div');
+  playerDot.className = 'player-dot';
+  playerDot.style.display = 'none';
+  mapInner.appendChild(playerDot);
+
+  // GPS 更新
+  GPS.startWatch((pos, acc) => {
+    const px = gpsToPixel(pos.lat, pos.lng);
+    playerDot.style.display = 'block';
+    playerDot.style.left = px.x + 'px';
+    playerDot.style.top = px.y + 'px';
+
+    document.getElementById('gpsStatus').textContent = `📡 精度 ${Math.round(acc)}m`;
+
+    CONFIG.GAMES.forEach(g => {
+      const dist = GPS.distanceTo(g.location);
+      const badge = document.getElementById(`dist-${g.id}`);
+      if (badge) badge.textContent = GPS.formatDistance(dist);
+
+      if (!unlocks[g.id] && !TEST_MODE && dist <= CONFIG.GPS.unlockRadius && acc <= CONFIG.GPS.accuracyThreshold) {
+        unlocks[g.id] = Date.now();
+        localStorage.setItem('lepoint_unlocks', JSON.stringify(unlocks));
+        AudioEngine.unlockGame();
+        alert(`🎉 已解鎖 ${g.icon} ${g.name}！`);
+        location.reload();
+      }
+    });
+
+    // 回報位置
+    API.post('WRITE', {
+      action: 'updateLocation',
+      playerId: session.playerId,
+      playerName: session.name,
+      teamId: session.teamId,
+      lat: pos.lat, lng: pos.lng
+    }).catch(() => {});
+  });
+
+  // 隊友定位
+  let teamDots = {};
+  setInterval(async () => {
+    if (document.hidden) return;
+    try {
+      const data = await API.get('getTeamLocations', { action: 'getTeamLocations', teamId: session.teamId }, 0);
+      if (data && data.locations) {
+        Object.values(teamDots).forEach(d => d.remove());
+        teamDots = {};
+        data.locations.forEach(loc => {
+          if (loc.playerId === session.playerId) return;
+          const px = gpsToPixel(loc.lat, loc.lng);
+          const dot = document.createElement('div');
+          dot.className = 'team-member-dot';
+          dot.style.left = px.x + 'px';
+          dot.style.top = px.y + 'px';
+          dot.title = loc.playerName;
+          mapInner.appendChild(dot);
+          teamDots[loc.playerId] = dot;
+        });
+      }
+    } catch {}
+  }, 15000 + Math.random() * 10000);
+
+  // ===== Tab 切換 =====
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-item').forEach((t, i) => t.classList.remove('active'));
+    document.getElementById('mapView').style.display = 'none';
+    document.getElementById('gameListView').style.display = 'none';
+    document.getElementById('taskListView').style.display = 'none';
+
+    if (tab === 'map') {
+      document.getElementById('mapView').style.display = 'block';
+      document.querySelectorAll('.tab-item')[0].classList.add('active');
+    } else if (tab === 'games') {
+      renderGameList();
+      document.getElementById('gameListView').style.display = 'block';
+      document.querySelectorAll('.tab-item')[1].classList.add('active');
+    } else if (tab === 'tasks') {
+      renderTaskList();
+      document.getElementById('taskListView').style.display = 'block';
+      document.querySelectorAll('.tab-item')[2].classList.add('active');
+    } else if (tab === 'scoreboard') {
+      window.location.href = 'scoreboard.html';
+    }
+    AudioEngine.tapButton();
+  }
+
+  function renderGameList() {
+    const el = document.getElementById('gameListView');
+    el.innerHTML = '<h2 style="font-size:20px;margin-bottom:16px;">🎮 遊戲關卡</h2>' +
+      CONFIG.GAMES.map(g => {
+        const isUnlocked = TEST_MODE || unlocks[g.id];
+        const dist = GPS.position ? GPS.formatDistance(GPS.distanceTo(g.location)) : '--';
+        return `<div class="game-card" onclick="${isUnlocked ? `window.location.href='game.html?id=${g.id}'` : ''}">
+          <div class="game-card-icon" style="background:${g.color}20;color:${g.color}">${g.icon}</div>
+          <div class="game-card-info">
+            <div class="game-card-name">${g.name}</div>
+            <div class="game-card-desc">${g.description}</div>
+            <div class="game-card-status" style="color:${isUnlocked ? '#4caf50' : '#999'}">
+              ${isUnlocked ? '✅ 已解鎖' : `🔒 距離 ${dist}`}
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+  }
+
+  function renderTaskList() {
+    const el = document.getElementById('taskListView');
+    el.innerHTML = '<h2 style="font-size:20px;margin-bottom:16px;">📋 任務進度</h2>' +
+      CONFIG.GAMES.map(g => {
+        const isUnlocked = TEST_MODE || unlocks[g.id];
+        const status = isUnlocked ? '✅' : '🔒';
+        return `<div class="task-item">
+          <div class="task-status-icon">${status}</div>
+          <div class="task-info">
+            <div class="task-name">${g.icon} ${g.name}</div>
+            <div class="task-meta">${isUnlocked ? '已解鎖 · 可開始遊戲' : '需要走到定點解鎖'}</div>
+          </div>
+        </div>`;
+      }).join('');
+  }
+
+  // 聊天
+  function sendChat() {
+    const input = document.getElementById('chat-input');
+    Chat.send(input.value);
+    input.value = '';
+  }
+  document.getElementById('chat-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendChat();
+  });
+
+  // 設定
+  function showSettings() {
+    if (confirm('選擇操作：\n\n[確定] 登出並重整\n[取消] 返回')) {
+      Auth.logout();
+      localStorage.removeItem('lepoint_unlocks');
+      window.location.href = 'index.html';
+    }
+  }
+</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>

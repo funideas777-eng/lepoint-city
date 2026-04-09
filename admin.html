@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#6C5CE7">
+  <title>管理後台 - 樂點城市冒險</title>
+  <link rel="stylesheet" href="css/common.css">
+  <style>
+    .admin-login { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; background:linear-gradient(135deg,#2d3436,#636e72); }
+    .admin-card { width:100%; max-width:400px; background:white; border-radius:20px; padding:32px 24px; box-shadow:0 10px 40px rgba(0,0,0,0.3); }
+    .admin-card h2 { text-align:center; margin-bottom:24px; }
+    .admin-panel { display:none; }
+    .admin-panel.show { display:block; }
+    .admin-section { background:white; border-radius:16px; padding:20px; margin-bottom:16px; box-shadow:var(--shadow); }
+    .admin-section h3 { font-size:16px; margin-bottom:12px; }
+    .stat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+    .stat-card { background:#f8f9fa; border-radius:12px; padding:12px; text-align:center; }
+    .stat-card .num { font-size:24px; font-weight:900; color:var(--primary); }
+    .stat-card .label { font-size:11px; color:var(--text-light); margin-top:4px; }
+  </style>
+</head>
+<body>
+
+<div class="admin-login" id="adminLogin">
+  <div class="admin-card">
+    <h2>🔐 管理後台</h2>
+    <div class="form-group">
+      <label class="form-label">管理員密碼</label>
+      <input type="password" class="input" id="adminPwd" placeholder="請輸入密碼">
+    </div>
+    <button class="btn btn-primary btn-block" onclick="adminAuth()">登入</button>
+  </div>
+</div>
+
+<div class="admin-panel" id="adminPanel">
+  <div class="top-bar">
+    <button class="top-bar-back" onclick="window.location.href='map.html'">←</button>
+    <div class="top-bar-title">🔧 管理後台</div>
+    <div style="width:40px;"></div>
+  </div>
+  <div class="page-container">
+    <!-- 儀表板 -->
+    <div class="admin-section">
+      <h3>📊 即時數據</h3>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="num" id="statPlayers">-</div><div class="label">已登入</div></div>
+        <div class="stat-card"><div class="num" id="statPlays">-</div><div class="label">遊戲次數</div></div>
+        <div class="stat-card"><div class="num" id="statUnlocks">-</div><div class="label">GPS 解鎖</div></div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="loadDashboard()">🔄 刷新</button>
+    </div>
+
+    <!-- 廣播 -->
+    <div class="admin-section">
+      <h3>📢 發送廣播</h3>
+      <textarea class="input" id="broadcastContent" rows="3" placeholder="輸入廣播訊息..." style="resize:none;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn btn-primary" onclick="sendBroadcast('text')">📢 發送文字</button>
+      </div>
+      <div id="broadcastHistory" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- 手動加分 -->
+    <div class="admin-section">
+      <h3>➕ 手動加分</h3>
+      <div class="form-group">
+        <select class="select" id="pointsTeam">
+          <option value="">選擇隊伍</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <input type="number" class="input" id="pointsAmount" placeholder="分數">
+      </div>
+      <div class="form-group">
+        <input type="text" class="input" id="pointsReason" placeholder="原因">
+      </div>
+      <button class="btn btn-accent" onclick="addPoints()">確認加分</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script>
+  API.init();
+  const ADMIN_PWD = '11201120';
+
+  function adminAuth() {
+    const pwd = document.getElementById('adminPwd').value;
+    if (pwd === ADMIN_PWD) {
+      document.getElementById('adminLogin').style.display = 'none';
+      document.getElementById('adminPanel').classList.add('show');
+      initAdmin();
+    } else {
+      alert('密碼錯誤');
+    }
+  }
+
+  function initAdmin() {
+    const sel = document.getElementById('pointsTeam');
+    CONFIG.TEAMS.forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = `${t.emoji} ${t.name}`;
+      sel.appendChild(opt);
+    });
+    loadDashboard();
+  }
+
+  async function loadDashboard() {
+    try {
+      const data = await API.get('getDashboard', { action: 'getDashboard', password: ADMIN_PWD }, 0);
+      if (data) {
+        document.getElementById('statPlayers').textContent = data.totalPlayers || 0;
+        document.getElementById('statPlays').textContent = data.totalPlays || 0;
+        document.getElementById('statUnlocks').textContent = data.totalUnlocks || 0;
+      }
+    } catch {}
+  }
+
+  async function sendBroadcast(type) {
+    const content = document.getElementById('broadcastContent').value.trim();
+    if (!content) { alert('請輸入內容'); return; }
+    try {
+      await API.post('ADMIN', { action: 'broadcast', password: ADMIN_PWD, type, content });
+      alert('廣播已發送！');
+      document.getElementById('broadcastContent').value = '';
+    } catch { alert('發送失敗'); }
+  }
+
+  async function addPoints() {
+    const teamId = document.getElementById('pointsTeam').value;
+    const points = parseInt(document.getElementById('pointsAmount').value);
+    const reason = document.getElementById('pointsReason').value.trim();
+    if (!teamId || !points) { alert('請填寫完整'); return; }
+    try {
+      await API.post('ADMIN', { action: 'addManualPoints', password: ADMIN_PWD, teamId: parseInt(teamId), points, detail: reason });
+      alert(`已加 ${points} 分！`);
+      document.getElementById('pointsAmount').value = '';
+      document.getElementById('pointsReason').value = '';
+    } catch { alert('加分失敗'); }
+  }
+</script>
+</body>
+</html>

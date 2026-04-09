@@ -1,0 +1,26 @@
+{
+  "name": "樂點城市冒險",
+  "short_name": "城市冒險",
+  "description": "GPS 定點解鎖組隊闖關遊戲",
+  "start_url": "/lepoint-city/index.html",
+  "display": "standalone",
+  "scope": "/lepoint-city/",
+  "orientation": "portrait",
+  "background_color": "#6C5CE7",
+  "theme_color": "#6C5CE7",
+  "lang": "zh-TW",
+  "icons": [
+    {
+      "src": "assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
