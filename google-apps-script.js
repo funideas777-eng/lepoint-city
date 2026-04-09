@@ -2,8 +2,8 @@
 // 樂點城市冒險 - Google Apps Script 後端
 // ============================================================
 
-const SPREADSHEET_ID = '';  // 建立後填入
-const DRIVE_FOLDER_ID = ''; // 建立後填入
+const SPREADSHEET_ID = '1zw5eYZQGZXnPxKNQT63wQuSQvEZXzTeoaM6czCbCEOA';
+const DRIVE_FOLDER_ID = '1L0yUtc90exNnia0iB4Qu_evnjY4jO-Yv';
 const ADMIN_PASSWORD = '11201120';
 
 // ========== 路由 ==========
