@@ -9,10 +9,10 @@ const CONFIG = {
 
   // GAS API（部署後替換）
   API_URL: {
-    READ:  '',
-    WRITE: '',
-    PHOTO: '',
-    ADMIN: ''
+    READ:  'https://script.google.com/macros/s/AKfycbzpeQtTNq947sQKk5qtIYP6qf7vsf_2vT1tOQcmbqdIcWRYeVF9l_00ZqhpjCn2eN5-rQ/exec',
+    WRITE: 'https://script.google.com/macros/s/AKfycbzpeQtTNq947sQKk5qtIYP6qf7vsf_2vT1tOQcmbqdIcWRYeVF9l_00ZqhpjCn2eN5-rQ/exec',
+    PHOTO: 'https://script.google.com/macros/s/AKfycbzpeQtTNq947sQKk5qtIYP6qf7vsf_2vT1tOQcmbqdIcWRYeVF9l_00ZqhpjCn2eN5-rQ/exec',
+    ADMIN: 'https://script.google.com/macros/s/AKfycbzpeQtTNq947sQKk5qtIYP6qf7vsf_2vT1tOQcmbqdIcWRYeVF9l_00ZqhpjCn2eN5-rQ/exec'
   },
 
   // 快取 TTL（毫秒）
