@@ -57,7 +57,7 @@
   AudioEngine.init(); API.init();
   const chipsEl = document.getElementById('gameChips');
   chipsEl.innerHTML = CONFIG.GAMES.map(g =>
-    `<div class="game-chip${g.id === 'memory' ? ' active' : ''}" data-game="${g.id}" onclick="selectGameChip(this,'${g.id}')">${g.icon} ${g.name}</div>`
+    `<div class="game-chip${g.id === 'whack' ? ' active' : ''}" data-game="${g.id}" onclick="selectGameChip(this,'${g.id}')">${g.icon} ${g.name}</div>`
   ).join('');
   function selectGameChip(el, gameId) {
     document.querySelectorAll('.game-chip').forEach(c => c.classList.remove('active'));

@@ -59,11 +59,12 @@ const CONFIG = {
   // ========== 4 款小遊戲 + GPS 座標 ==========
   GAMES: [
     {
-      id: 'memory',
-      name: '記憶翻牌',
-      icon: '🃏',
-      description: '翻開配對相同圖案，考驗你的記憶力！',
-      duration: 90,
+      id: 'photo',
+      name: '城市拍拍',
+      icon: '📸',
+      type: 'photo',
+      description: '到達定點後拍攝現場照片上傳，等待管理員驗證通過即得分！',
+      points: 200,
       color: '#9C27B0',
       location: { lat: 25.006861, lng: 121.202694 }
     },
@@ -71,17 +72,20 @@ const CONFIG = {
       id: 'whack',
       name: '城市快打',
       icon: '🔨',
+      type: 'game',
       description: '快速點擊冒出的目標，手速大考驗！',
       duration: 45,
       color: '#FF5722',
       location: { lat: 25.007000, lng: 121.202889 }
     },
     {
-      id: 'quiz',
-      name: '知識問答',
-      icon: '🧠',
-      description: '回答問題，考驗你的知識廣度！',
-      duration: 120,
+      id: 'walk',
+      name: '城市漫步',
+      icon: '🚶',
+      type: 'walk',
+      description: '累積移動 500 公尺即可完成任務，邊走邊探索城市！',
+      targetDistance: 500,
+      points: 200,
       color: '#2196F3',
       location: { lat: 25.006917, lng: 121.202500 }
     },
@@ -89,6 +93,7 @@ const CONFIG = {
       id: 'snake',
       name: '貪食蛇',
       icon: '🐍',
+      type: 'game',
       description: '控制蛇吃食物，越長分越高！',
       duration: 60,
       color: '#4CAF50',

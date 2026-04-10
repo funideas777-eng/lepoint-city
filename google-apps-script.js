@@ -21,7 +21,9 @@ function doGet(e) {
     getDashboard: handleGetDashboard,
     getChat: handleGetChat,
     getTeamLocations: handleGetTeamLocations,
-    getPlayerTasks: handleGetPlayerTasks
+    getPlayerTasks: handleGetPlayerTasks,
+    getPhotoStatus: handleGetPhotoStatus,
+    getPendingPhotos: handleGetPendingPhotos
   };
 
   const handler = handlers[action];
@@ -50,7 +52,8 @@ function doPost(e) {
     addManualPoints: handleAddManualPoints,
     recalcTeamPoints: handleRecalcTeamPoints,
     sendChat: handleSendChat,
-    updateLocation: handleUpdateLocation
+    updateLocation: handleUpdateLocation,
+    submitPhotoTask: handleSubmitPhotoTask
   };
 
   const handler = handlers[action];
@@ -155,9 +158,9 @@ function handleGetBroadcasts(params) {
 function handleGetGameLocations(params) {
   return {
     locations: [
-      { gameId: 'memory', lat: 25.006861, lng: 121.202694, radius: 25 },
+      { gameId: 'photo', lat: 25.006861, lng: 121.202694, radius: 25 },
       { gameId: 'whack', lat: 25.007000, lng: 121.202889, radius: 25 },
-      { gameId: 'quiz', lat: 25.006917, lng: 121.202500, radius: 25 },
+      { gameId: 'walk', lat: 25.006917, lng: 121.202500, radius: 25 },
       { gameId: 'snake', lat: 25.006389, lng: 121.202556, radius: 25 }
     ]
   };
@@ -182,7 +185,13 @@ function handleGetDashboard(params) {
   const players = getSheet('Players').getLastRow() - 1;
   const plays = getSheet('GameScores').getLastRow() - 1;
   const unlocks = getSheet('GameUnlocks').getLastRow() - 1;
-  return { totalPlayers: Math.max(0, players), totalPlays: Math.max(0, plays), totalUnlocks: Math.max(0, unlocks) };
+  let pendingPhotos = 0;
+  const photoSheet = getSheet('PhotoTasks');
+  if (photoSheet && photoSheet.getLastRow() > 1) {
+    const photoData = photoSheet.getDataRange().getValues();
+    pendingPhotos = photoData.slice(1).filter(r => r[6] === 'pending').length;
+  }
+  return { totalPlayers: Math.max(0, players), totalPlays: Math.max(0, plays), totalUnlocks: Math.max(0, unlocks), pendingPhotos };
 }
 
 function handleGetChat(params) {
@@ -233,7 +242,7 @@ function handleGetPlayerTasks(params) {
   const unlocked = new Set(unlockData.slice(1).filter(r => r[0] === playerId).map(r => r[1]));
   const played = new Set(scoreData.slice(1).filter(r => r[0] === playerId).map(r => r[3]));
 
-  const tasks = ['memory', 'whack', 'quiz', 'snake'].map(gid => ({
+  const tasks = ['photo', 'whack', 'walk', 'snake'].map(gid => ({
     gameId: gid,
     unlocked: unlocked.has(gid),
     played: played.has(gid)
@@ -392,6 +401,93 @@ function handleUpdateLocation(body) {
   return { success: true };
 }
 
+// ========== 拍照任務 ==========
+function handleSubmitPhotoTask(body) {
+  const sheet = getSheet('PhotoTasks');
+  const submissionId = 'ph_' + Date.now();
+  sheet.appendRow([
+    submissionId, body.playerId, body.playerName, body.teamId,
+    body.gameId || 'photo', body.photoUrl, 'pending', new Date().toISOString(), ''
+  ]);
+  return { success: true, submissionId: submissionId };
+}
+
+function handleGetPhotoStatus(params) {
+  const playerId = params.playerId;
+  const gameId = params.gameId || 'photo';
+  const sheet = getSheet('PhotoTasks');
+  if (!sheet) return { submission: null };
+  const data = sheet.getDataRange().getValues();
+
+  // 取最新一筆
+  const rows = data.slice(1).filter(r => r[1] === playerId && r[4] === gameId);
+  if (rows.length === 0) return { submission: null };
+
+  const latest = rows[rows.length - 1];
+  return {
+    submission: {
+      submissionId: latest[0], playerId: latest[1], playerName: latest[2],
+      teamId: latest[3], gameId: latest[4], photoUrl: latest[5],
+      status: latest[6], submittedAt: latest[7], verifiedAt: latest[8],
+      points: latest[6] === 'approved' ? 200 : 0
+    }
+  };
+}
+
+function handleGetPendingPhotos(params) {
+  if (params.password !== ADMIN_PASSWORD) return { error: 'Unauthorized' };
+  const sheet = getSheet('PhotoTasks');
+  if (!sheet) return { photos: [] };
+  const data = sheet.getDataRange().getValues();
+
+  const photos = data.slice(1).map((r, idx) => ({
+    row: idx + 2,
+    submissionId: r[0], playerId: r[1], playerName: r[2],
+    teamId: r[3], gameId: r[4], photoUrl: r[5],
+    status: r[6], submittedAt: r[7], verifiedAt: r[8]
+  }));
+
+  return { photos };
+}
+
+function handleVerifyPhoto(body) {
+  if (body.password !== ADMIN_PASSWORD) return { error: 'Unauthorized' };
+  const sheet = getSheet('PhotoTasks');
+  const data = sheet.getDataRange().getValues();
+
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === body.submissionId) {
+      const newStatus = body.approved ? 'approved' : 'rejected';
+      sheet.getRange(i + 1, 7).setValue(newStatus);
+      sheet.getRange(i + 1, 9).setValue(new Date().toISOString());
+
+      // 驗證通過 → 加分
+      if (body.approved) {
+        const teamId = data[i][3];
+        const playerId = data[i][1];
+        const playerName = data[i][2];
+        const points = 200;
+
+        // 寫入 GameScores
+        const scoreSheet = getSheet('GameScores');
+        scoreSheet.appendRow([playerId, playerName, teamId, 'photo', points, new Date().toISOString()]);
+
+        // 寫入 TeamPoints
+        const pointsSheet = getSheet('TeamPoints');
+        pointsSheet.appendRow([teamId, 'photo_task', points, '拍照任務通過', new Date().toISOString()]);
+
+        recalcAllTeamPoints();
+        getCache().remove('scores_photo');
+        getCache().remove('rankings');
+      }
+
+      return { success: true, status: newStatus };
+    }
+  }
+
+  return { error: 'Submission not found' };
+}
+
 // ========== 初始化試算表 ==========
 function initSpreadsheet() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
@@ -405,7 +501,8 @@ function initSpreadsheet() {
     'Broadcasts': ['broadcastId', 'type', 'content', 'timestamp'],
     'Config': ['key', 'value'],
     'Chat': ['msgId', 'channel', 'teamId', 'playerId', 'playerName', 'teamName', 'teamEmoji', 'content', 'timestamp'],
-    'PlayerLocations': ['playerId', 'playerName', 'teamId', 'lat', 'lng', 'timestamp']
+    'PlayerLocations': ['playerId', 'playerName', 'teamId', 'lat', 'lng', 'timestamp'],
+    'PhotoTasks': ['submissionId', 'playerId', 'playerName', 'teamId', 'gameId', 'photoUrl', 'status', 'submittedAt', 'verifiedAt']
   };
 
   Object.entries(sheets).forEach(([name, headers]) => {

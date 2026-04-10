@@ -1,8 +1,10 @@
-const CACHE_NAME = 'lepoint-city-v1';
+const CACHE_NAME = 'lepoint-city-v2';
 const STATIC_ASSETS = [
   '/lepoint-city/index.html',
   '/lepoint-city/map.html',
   '/lepoint-city/game.html',
+  '/lepoint-city/photo-task.html',
+  '/lepoint-city/walk-task.html',
   '/lepoint-city/scoreboard.html',
   '/lepoint-city/admin.html',
   '/lepoint-city/css/common.css',
@@ -14,9 +16,7 @@ const STATIC_ASSETS = [
   '/lepoint-city/js/broadcast.js',
   '/lepoint-city/js/chat.js',
   '/lepoint-city/js/scoreboard-engine.js',
-  '/lepoint-city/js/games/memory.js',
   '/lepoint-city/js/games/whack.js',
-  '/lepoint-city/js/games/quiz.js',
   '/lepoint-city/js/games/snake.js',
   '/lepoint-city/assets/icons/icon-192.png',
   '/lepoint-city/assets/icons/icon-512.png',

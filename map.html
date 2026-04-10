@@ -155,7 +155,9 @@
     pin.innerHTML = isUnlocked ? g.icon : '🔒';
     pin.onclick = () => {
       if (isUnlocked || TEST_MODE) {
-        window.location.href = `game.html?id=${g.id}`;
+        if (g.type === 'photo') window.location.href = 'photo-task.html';
+        else if (g.type === 'walk') window.location.href = 'walk-task.html';
+        else window.location.href = `game.html?id=${g.id}`;
       } else {
         alert(`${g.icon} ${g.name}\n需要走到定點 ${CONFIG.GPS.unlockRadius}m 內解鎖`);
       }
@@ -261,7 +263,13 @@
       CONFIG.GAMES.map(g => {
         const isUnlocked = TEST_MODE || unlocks[g.id];
         const dist = GPS.position ? GPS.formatDistance(GPS.distanceTo(g.location)) : '--';
-        return `<div class="game-card" onclick="${isUnlocked ? `window.location.href='game.html?id=${g.id}'` : ''}">
+        let href = '';
+        if (isUnlocked) {
+          if (g.type === 'photo') href = 'photo-task.html';
+          else if (g.type === 'walk') href = 'walk-task.html';
+          else href = `game.html?id=${g.id}`;
+        }
+        return `<div class="game-card" onclick="${isUnlocked ? `window.location.href='${href}'` : ''}">
           <div class="game-card-icon" style="background:${g.color}20;color:${g.color}">${g.icon}</div>
           <div class="game-card-info">
             <div class="game-card-name">${g.name}</div>
@@ -276,15 +284,32 @@
 
   function renderTaskList() {
     const el = document.getElementById('taskListView');
+    const photoDone = localStorage.getItem('lepoint_photo_submission');
+    const walkDone = localStorage.getItem('lepoint_walk_done');
+
     el.innerHTML = '<h2 style="font-size:20px;margin-bottom:16px;">📋 任務進度</h2>' +
       CONFIG.GAMES.map(g => {
         const isUnlocked = TEST_MODE || unlocks[g.id];
-        const status = isUnlocked ? '✅' : '🔒';
+        let status = '🔒', meta = '需要走到定點解鎖';
+
+        if (isUnlocked) {
+          if (g.type === 'photo') {
+            status = photoDone ? '⏳' : '📸';
+            meta = photoDone ? '已上傳，等待驗證中' : '已解鎖 · 拍照上傳';
+          } else if (g.type === 'walk') {
+            status = walkDone ? '✅' : '🚶';
+            meta = walkDone ? '已完成 · 200 分' : '已解鎖 · 累積移動 500m';
+          } else {
+            status = '✅';
+            meta = '已解鎖 · 可開始遊戲';
+          }
+        }
+
         return `<div class="task-item">
           <div class="task-status-icon">${status}</div>
           <div class="task-info">
             <div class="task-name">${g.icon} ${g.name}</div>
-            <div class="task-meta">${isUnlocked ? '已解鎖 · 可開始遊戲' : '需要走到定點解鎖'}</div>
+            <div class="task-meta">${meta}</div>
           </div>
         </div>`;
       }).join('');

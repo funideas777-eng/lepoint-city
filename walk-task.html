@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2196F3">
+  <link rel="manifest" href="manifest.json">
+  <title>城市漫步 - 樂點城市冒險</title>
+  <link rel="stylesheet" href="css/common.css">
+  <style>
+    body { background:#1a1a2e; }
+    .walk-page { min-height:100vh; color:white; }
+    .walk-content { padding:20px; max-width:420px; margin:0 auto; text-align:center; }
+    .walk-ring { width:220px; height:220px; border-radius:50%; margin:24px auto; position:relative; display:flex; align-items:center; justify-content:center; }
+    .walk-ring svg { position:absolute; top:0; left:0; transform:rotate(-90deg); }
+    .walk-ring-bg { fill:none; stroke:rgba(255,255,255,0.1); stroke-width:12; }
+    .walk-ring-fill { fill:none; stroke:#2196F3; stroke-width:12; stroke-linecap:round; transition:stroke-dashoffset 0.5s ease; }
+    .walk-center { position:relative; z-index:1; }
+    .walk-distance { font-size:42px; font-weight:900; }
+    .walk-unit { font-size:14px; color:rgba(255,255,255,0.5); }
+    .walk-target { font-size:13px; color:rgba(255,255,255,0.4); margin-top:4px; }
+    .walk-stats { display:flex; gap:12px; margin:20px 0; }
+    .walk-stat { flex:1; background:rgba(255,255,255,0.08); border-radius:12px; padding:14px; }
+    .walk-stat-value { font-size:22px; font-weight:800; }
+    .walk-stat-label { font-size:11px; color:rgba(255,255,255,0.5); margin-top:4px; }
+    .walk-status { background:rgba(255,255,255,0.06); border-radius:16px; padding:16px; margin:16px 0; font-size:14px; line-height:1.6; }
+    .walk-complete { animation:fadeIn 0.5s ease; }
+    .walk-complete-icon { font-size:64px; margin-bottom:12px; }
+    .walk-complete-title { font-size:24px; font-weight:900; margin-bottom:8px; }
+    .walk-complete-desc { font-size:14px; color:rgba(255,255,255,0.6); }
+  </style>
+</head>
+<body>
+<div class="walk-page">
+  <div class="top-bar" style="background:rgba(0,0,0,0.5);">
+    <button class="top-bar-back" onclick="window.location.href='map.html'">←</button>
+    <div class="top-bar-title">🚶 城市漫步</div>
+    <div style="width:40px;"></div>
+  </div>
+
+  <div class="walk-content">
+    <!-- 進行中 -->
+    <div id="walkActive">
+      <div class="walk-status" id="walkHint">
+        🚶 開始移動吧！累積走完 <strong>500 公尺</strong> 即可完成任務
+      </div>
+
+      <div class="walk-ring">
+        <svg width="220" height="220" viewBox="0 0 220 220">
+          <circle class="walk-ring-bg" cx="110" cy="110" r="100"/>
+          <circle class="walk-ring-fill" id="progressRing" cx="110" cy="110" r="100"
+            stroke-dasharray="628.3" stroke-dashoffset="628.3"/>
+        </svg>
+        <div class="walk-center">
+          <div class="walk-distance" id="distanceDisplay">0</div>
+          <div class="walk-unit">公尺</div>
+          <div class="walk-target">/ 500m</div>
+        </div>
+      </div>
+
+      <div class="walk-stats">
+        <div class="walk-stat">
+          <div class="walk-stat-value" id="stepTime">0:00</div>
+          <div class="walk-stat-label">已行走時間</div>
+        </div>
+        <div class="walk-stat">
+          <div class="walk-stat-value" id="gpsAcc">--</div>
+          <div class="walk-stat-label">GPS 精度</div>
+        </div>
+      </div>
+
+      <div class="walk-status" style="font-size:12px;color:rgba(255,255,255,0.4);">
+        📡 請保持 GPS 開啟，在戶外行走效果最佳<br>
+        GPS 精度需在 50m 內才會計算距離
+      </div>
+    </div>
+
+    <!-- 完成 -->
+    <div id="walkComplete" style="display:none;" class="walk-complete">
+      <div class="walk-complete-icon">🎉</div>
+      <div class="walk-complete-title">任務完成！</div>
+      <div class="walk-complete-desc">你已累積移動超過 500 公尺</div>
+      <div class="walk-stats" style="margin:24px 0;">
+        <div class="walk-stat">
+          <div class="walk-stat-value" id="finalDist">500</div>
+          <div class="walk-stat-label">總距離 (m)</div>
+        </div>
+        <div class="walk-stat">
+          <div class="walk-stat-value" id="finalTime">0:00</div>
+          <div class="walk-stat-label">總時間</div>
+        </div>
+      </div>
+      <div class="status-card" style="background:rgba(76,175,80,0.15);border:2px solid #4caf50;border-radius:16px;padding:16px;margin:16px 0;">
+        <div style="font-size:36px;">✅</div>
+        <div style="font-size:16px;font-weight:700;margin-top:8px;">已獲得 200 分</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-top:4px;">積分已即時更新至團隊</div>
+      </div>
+      <button class="btn btn-primary btn-block btn-lg" onclick="window.location.href='map.html'">↩ 返回地圖</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/gps.js"></script>
+<script>
+  if (!Auth.requireLogin()) throw new Error('未登入');
+  AudioEngine.init(); API.init();
+
+  const session = Auth.getSession();
+  const TARGET = 500; // 目標距離
+  const CIRCUMFERENCE = 628.3; // 2 * PI * 100
+
+  let totalDistance = 0;
+  let lastPos = null;
+  let startTime = Date.now();
+  let completed = false;
+  let timeTimer = null;
+
+  // 恢復進度
+  const saved = localStorage.getItem('lepoint_walk_progress');
+  if (saved) {
+    try {
+      const p = JSON.parse(saved);
+      totalDistance = p.distance || 0;
+      startTime = p.startTime || Date.now();
+      if (p.completed) {
+        completed = true;
+        showComplete();
+      }
+    } catch {}
+  }
+
+  // 檢查是否已完成（從伺服器）
+  const walkDone = localStorage.getItem('lepoint_walk_done');
+  if (walkDone) {
+    completed = true;
+    showComplete();
+  }
+
+  updateDisplay();
+
+  // 計時器
+  timeTimer = setInterval(() => {
+    if (!completed) updateTime();
+  }, 1000);
+
+  // GPS 追蹤
+  GPS.startWatch((pos, acc) => {
+    document.getElementById('gpsAcc').textContent = Math.round(acc) + 'm';
+
+    if (completed) return;
+    if (acc > CONFIG.GPS.accuracyThreshold) return; // 精度不夠不計算
+
+    if (lastPos) {
+      const d = GPS.distance(lastPos.lat, lastPos.lng, pos.lat, pos.lng);
+      // 過濾跳點：單次移動不超過 50m（避免 GPS 漂移）
+      if (d > 1 && d < 50) {
+        totalDistance += d;
+        saveProgress();
+        updateDisplay();
+
+        if (totalDistance >= TARGET && !completed) {
+          completed = true;
+          completeTask();
+        }
+      }
+    }
+    lastPos = { lat: pos.lat, lng: pos.lng };
+  });
+
+  function updateDisplay() {
+    const dist = Math.min(Math.round(totalDistance), TARGET);
+    document.getElementById('distanceDisplay').textContent = dist;
+
+    const progress = Math.min(totalDistance / TARGET, 1);
+    const offset = CIRCUMFERENCE * (1 - progress);
+    document.getElementById('progressRing').style.strokeDashoffset = offset;
+
+    // 顏色變化
+    const ring = document.getElementById('progressRing');
+    if (progress >= 1) ring.style.stroke = '#4caf50';
+    else if (progress >= 0.7) ring.style.stroke = '#ff9800';
+    else ring.style.stroke = '#2196F3';
+
+    updateTime();
+  }
+
+  function updateTime() {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const min = Math.floor(elapsed / 60);
+    const sec = elapsed % 60;
+    const timeStr = `${min}:${sec.toString().padStart(2, '0')}`;
+    document.getElementById('stepTime').textContent = timeStr;
+  }
+
+  function saveProgress() {
+    localStorage.setItem('lepoint_walk_progress', JSON.stringify({
+      distance: totalDistance,
+      startTime: startTime,
+      completed: completed
+    }));
+  }
+
+  async function completeTask() {
+    saveProgress();
+    AudioEngine.unlockGame();
+
+    // 提交分數
+    try {
+      await API.post('WRITE', {
+        action: 'submitScore',
+        playerId: session.playerId,
+        playerName: session.name,
+        teamId: session.teamId,
+        gameId: 'walk',
+        score: 200
+      });
+    } catch {}
+
+    localStorage.setItem('lepoint_walk_done', '1');
+    showComplete();
+  }
+
+  function showComplete() {
+    document.getElementById('walkActive').style.display = 'none';
+    document.getElementById('walkComplete').style.display = 'block';
+    document.getElementById('finalDist').textContent = Math.round(totalDistance);
+
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const min = Math.floor(elapsed / 60);
+    const sec = elapsed % 60;
+    document.getElementById('finalTime').textContent = `${min}:${sec.toString().padStart(2, '0')}`;
+
+    if (timeTimer) clearInterval(timeTimer);
+  }
+</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>

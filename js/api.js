@@ -19,12 +19,12 @@ const API = {
   },
 
   getBaseUrl(endpoint) {
-    if (['getChat', 'getChat_team', 'getChat_world', 'getTeamLocations', 'getPlayerTasks'].includes(endpoint)) {
+    if (['getChat', 'getChat_team', 'getChat_world', 'getTeamLocations', 'getPlayerTasks', 'getPhotoStatus', 'getPendingPhotos'].includes(endpoint)) {
       return CONFIG.API_URL.READ;
     }
     const map = {
       register: 'WRITE', unlockGame: 'WRITE', submitScore: 'WRITE',
-      completeAdventure: 'WRITE', sendChat: 'WRITE', updateLocation: 'WRITE',
+      completeAdventure: 'WRITE', sendChat: 'WRITE', updateLocation: 'WRITE', submitPhotoTask: 'WRITE',
       addManualPoints: 'ADMIN', broadcast: 'ADMIN', verifyPhoto: 'ADMIN',
       recalcTeamPoints: 'ADMIN', uploadPhoto: 'PHOTO'
     };

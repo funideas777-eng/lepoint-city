@@ -18,6 +18,15 @@
     .stat-card { background:#f8f9fa; border-radius:12px; padding:12px; text-align:center; }
     .stat-card .num { font-size:24px; font-weight:900; color:var(--primary); }
     .stat-card .label { font-size:11px; color:var(--text-light); margin-top:4px; }
+    .photo-review-card { background:#f8f9fa; border-radius:12px; padding:14px; margin-bottom:12px; }
+    .photo-review-card img { width:100%; border-radius:8px; margin-bottom:10px; max-height:240px; object-fit:cover; }
+    .photo-review-meta { font-size:12px; color:var(--text-light); margin-bottom:8px; }
+    .photo-review-meta strong { color:var(--text); }
+    .photo-review-actions { display:flex; gap:8px; }
+    .photo-status-badge { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:700; }
+    .badge-pending { background:#fff3e0; color:#e65100; }
+    .badge-approved { background:#e8f5e9; color:#2e7d32; }
+    .badge-rejected { background:#ffebee; color:#c62828; }
   </style>
 </head>
 <body>
@@ -43,10 +52,11 @@
     <!-- 儀表板 -->
     <div class="admin-section">
       <h3>📊 即時數據</h3>
-      <div class="stat-grid">
+      <div class="stat-grid" style="grid-template-columns:repeat(2,1fr);">
         <div class="stat-card"><div class="num" id="statPlayers">-</div><div class="label">已登入</div></div>
         <div class="stat-card"><div class="num" id="statPlays">-</div><div class="label">遊戲次數</div></div>
         <div class="stat-card"><div class="num" id="statUnlocks">-</div><div class="label">GPS 解鎖</div></div>
+        <div class="stat-card"><div class="num" id="statPending">-</div><div class="label">待審照片</div></div>
       </div>
       <button class="btn btn-outline btn-sm" onclick="loadDashboard()">🔄 刷新</button>
     </div>
@@ -59,6 +69,13 @@
         <button class="btn btn-primary" onclick="sendBroadcast('text')">📢 發送文字</button>
       </div>
       <div id="broadcastHistory" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- 照片審核 -->
+    <div class="admin-section">
+      <h3>📸 照片審核</h3>
+      <button class="btn btn-outline btn-sm" onclick="loadPhotos()">🔄 刷新照片</button>
+      <div id="photoList" style="margin-top:12px;"></div>
     </div>
 
     <!-- 手動加分 -->
@@ -107,6 +124,65 @@
       sel.appendChild(opt);
     });
     loadDashboard();
+    loadPhotos();
+    // 自動每 8 秒刷新照片
+    setInterval(loadPhotos, 8000);
+  }
+
+  async function loadPhotos() {
+    try {
+      const data = await API.get('getPendingPhotos', { action: 'getPendingPhotos', password: ADMIN_PWD }, 0);
+      if (!data || !data.photos) return;
+
+      const container = document.getElementById('photoList');
+      const photos = data.photos;
+
+      if (photos.length === 0) {
+        container.innerHTML = '<div style="text-align:center;color:#999;padding:20px;">目前沒有照片</div>';
+        return;
+      }
+
+      // 待審核排前面
+      const sorted = photos.sort((a, b) => {
+        if (a.status === 'pending' && b.status !== 'pending') return -1;
+        if (a.status !== 'pending' && b.status === 'pending') return 1;
+        return 0;
+      });
+
+      container.innerHTML = sorted.map(p => {
+        const team = CONFIG.TEAMS.find(t => t.id === p.teamId);
+        const teamLabel = team ? `${team.emoji} ${team.name}` : `隊伍${p.teamId}`;
+        const time = new Date(p.submittedAt).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+        const badgeClass = p.status === 'approved' ? 'badge-approved' : p.status === 'rejected' ? 'badge-rejected' : 'badge-pending';
+        const badgeText = p.status === 'approved' ? '✅ 已通過' : p.status === 'rejected' ? '❌ 未通過' : '⏳ 待審核';
+
+        return `<div class="photo-review-card">
+          <img src="${p.photoUrl}" alt="照片" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22150%22><text x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2214%22>載入中...</text></svg>'">
+          <div class="photo-review-meta">
+            <strong>${p.playerName}</strong> · ${teamLabel} · ${time}
+            <span class="photo-status-badge ${badgeClass}" style="margin-left:8px;">${badgeText}</span>
+          </div>
+          ${p.status === 'pending' ? `
+            <div class="photo-review-actions">
+              <button class="btn btn-primary btn-sm" onclick="verifyPhoto('${p.submissionId}', true)">✅ 通過 (+200分)</button>
+              <button class="btn btn-outline btn-sm" style="color:#f44336;border-color:#f44336;" onclick="verifyPhoto('${p.submissionId}', false)">❌ 不通過</button>
+            </div>` : ''}
+        </div>`;
+      }).join('');
+    } catch (e) {
+      console.warn('載入照片失敗', e);
+    }
+  }
+
+  async function verifyPhoto(submissionId, approved) {
+    const action = approved ? '通過' : '拒絕';
+    if (!confirm(`確定${action}這張照片？${approved ? '\n將立即加 200 分給該團隊' : '\n玩家將收到重拍通知'}`)) return;
+    try {
+      await API.post('ADMIN', { action: 'verifyPhoto', password: ADMIN_PWD, submissionId, approved });
+      alert(`已${action}！${approved ? '積分已即時更新' : '玩家將看到重拍提示'}`);
+      loadPhotos();
+      loadDashboard();
+    } catch { alert('操作失敗'); }
   }
 
   async function loadDashboard() {
@@ -116,6 +192,7 @@
         document.getElementById('statPlayers').textContent = data.totalPlayers || 0;
         document.getElementById('statPlays').textContent = data.totalPlays || 0;
         document.getElementById('statUnlocks').textContent = data.totalUnlocks || 0;
+        document.getElementById('statPending').textContent = data.pendingPhotos || 0;
       }
     } catch {}
   }

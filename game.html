@@ -101,6 +101,10 @@
 
   if (!gameConfig) { alert('遊戲不存在'); window.location.href = 'map.html'; }
 
+  // 非小遊戲類型，跳轉到對應頁面
+  if (gameConfig.type === 'photo') { window.location.href = 'photo-task.html'; }
+  if (gameConfig.type === 'walk') { window.location.href = 'walk-task.html'; }
+
   document.getElementById('gameTitle').textContent = `${gameConfig.icon} ${gameConfig.name}`;
   document.getElementById('introIcon').textContent = gameConfig.icon;
   document.getElementById('introTitle').textContent = gameConfig.name;
@@ -108,9 +112,7 @@
 
   // 遊戲引擎映射
   const GAME_ENGINES = {
-    memory: { file: 'js/games/memory.js', engine: 'MemoryGame' },
     whack: { file: 'js/games/whack.js', engine: 'WhackGame' },
-    quiz: { file: 'js/games/quiz.js', engine: 'QuizGame' },
     snake: { file: 'js/games/snake.js', engine: 'SnakeGame' }
   };
 

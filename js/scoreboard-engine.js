@@ -5,7 +5,7 @@
 const ScoreboardEngine = {
   pollTimer: null,
   currentTab: 'team',
-  currentGame: 'memory',
+  currentGame: 'whack',
   rankings: [],
   maxPoints: 0,
 
