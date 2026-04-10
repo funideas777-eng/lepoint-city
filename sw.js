@@ -1,4 +1,4 @@
-const CACHE_NAME = 'lepoint-city-v2';
+const CACHE_NAME = 'lepoint-city-v3';
 const STATIC_ASSETS = [
   '/lepoint-city/index.html',
   '/lepoint-city/map.html',

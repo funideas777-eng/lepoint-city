@@ -336,8 +336,10 @@ function handleUploadPhoto(body) {
     const folder = DriveApp.getFolderById(DRIVE_FOLDER_ID);
     const file = folder.createFile(blob);
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    const url = 'https://drive.google.com/uc?id=' + file.getId();
-    return { success: true, photoUrl: url };
+    const fileId = file.getId();
+    const url = 'https://lh3.googleusercontent.com/d/' + fileId;
+    const thumbUrl = 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w400';
+    return { success: true, photoUrl: url, thumbUrl: thumbUrl, fileId: fileId };
   } catch (e) {
     return { error: e.message };
   }
@@ -424,10 +426,16 @@ function handleGetPhotoStatus(params) {
   if (rows.length === 0) return { submission: null };
 
   const latest = rows[rows.length - 1];
+  const photoUrl = latest[5];
+  // 從 photoUrl 提取 fileId 產生縮圖
+  let thumbUrl = photoUrl;
+  const match = photoUrl.match(/\/d\/([^\/\?]+)/);
+  if (match) thumbUrl = 'https://drive.google.com/thumbnail?id=' + match[1] + '&sz=w400';
+
   return {
     submission: {
       submissionId: latest[0], playerId: latest[1], playerName: latest[2],
-      teamId: latest[3], gameId: latest[4], photoUrl: latest[5],
+      teamId: latest[3], gameId: latest[4], photoUrl: photoUrl, thumbUrl: thumbUrl,
       status: latest[6], submittedAt: latest[7], verifiedAt: latest[8],
       points: latest[6] === 'approved' ? 200 : 0
     }
@@ -440,12 +448,19 @@ function handleGetPendingPhotos(params) {
   if (!sheet) return { photos: [] };
   const data = sheet.getDataRange().getValues();
 
-  const photos = data.slice(1).map((r, idx) => ({
-    row: idx + 2,
-    submissionId: r[0], playerId: r[1], playerName: r[2],
-    teamId: r[3], gameId: r[4], photoUrl: r[5],
-    status: r[6], submittedAt: r[7], verifiedAt: r[8]
-  }));
+  const photos = data.slice(1).map((r, idx) => {
+    const photoUrl = r[5] || '';
+    let thumbUrl = photoUrl;
+    const match = photoUrl.match(/\/d\/([^\/\?]+)/);
+    if (match) thumbUrl = 'https://drive.google.com/thumbnail?id=' + match[1] + '&sz=w400';
+
+    return {
+      row: idx + 2,
+      submissionId: r[0], playerId: r[1], playerName: r[2],
+      teamId: r[3], gameId: r[4], photoUrl: photoUrl, thumbUrl: thumbUrl,
+      status: r[6], submittedAt: r[7], verifiedAt: r[8]
+    };
+  });
 
   return { photos };
 }

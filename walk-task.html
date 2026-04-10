@@ -148,19 +148,32 @@
   }, 1000);
 
   // GPS 追蹤
+  let gpsUpdateCount = 0;
   GPS.startWatch((pos, acc) => {
+    gpsUpdateCount++;
     document.getElementById('gpsAcc').textContent = Math.round(acc) + 'm';
 
     if (completed) return;
-    if (acc > CONFIG.GPS.accuracyThreshold) return; // 精度不夠不計算
+
+    // 精度不夠時仍記錄位置但不計距離
+    if (acc > CONFIG.GPS.accuracyThreshold) {
+      // 即使精度不夠也要記住位置，避免下次精度好時產生大跳躍
+      lastPos = { lat: pos.lat, lng: pos.lng };
+      return;
+    }
 
     if (lastPos) {
       const d = GPS.distance(lastPos.lat, lastPos.lng, pos.lat, pos.lng);
-      // 過濾跳點：單次移動不超過 50m（避免 GPS 漂移）
-      if (d > 1 && d < 50) {
+      // 過濾跳點：移動 > 0.5m 且 < 80m（放寬過濾門檻）
+      if (d > 0.5 && d < 80) {
         totalDistance += d;
         saveProgress();
         updateDisplay();
+
+        // 更新提示
+        const pct = Math.round(totalDistance / TARGET * 100);
+        document.getElementById('walkHint').innerHTML =
+          `🚶 已移動 <strong>${Math.round(totalDistance)}</strong> / ${TARGET} 公尺（${Math.min(pct, 100)}%）`;
 
         if (totalDistance >= TARGET && !completed) {
           completed = true;

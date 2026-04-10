@@ -239,8 +239,9 @@
       const retake = document.getElementById('retakeSection');
       const preview = document.getElementById('uploadedPreview');
 
-      if (s.photoUrl) {
-        preview.innerHTML = `<img src="${s.photoUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:16px;">`;
+      const imgSrc = s.thumbUrl || s.photoUrl;
+      if (imgSrc) {
+        preview.innerHTML = `<img src="${imgSrc}" style="width:100%;height:100%;object-fit:cover;border-radius:16px;">`;
       }
 
       if (s.status === 'approved') {

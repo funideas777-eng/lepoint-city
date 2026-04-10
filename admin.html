@@ -92,7 +92,7 @@
       <div class="form-group">
         <input type="text" class="input" id="pointsReason" placeholder="原因">
       </div>
-      <button class="btn btn-accent" onclick="addPoints()">確認加分</button>
+      <button class="btn btn-accent" id="addPointsBtn" onclick="addPoints()">確認加分</button>
     </div>
   </div>
 </div>
@@ -125,8 +125,8 @@
     });
     loadDashboard();
     loadPhotos();
-    // 自動每 8 秒刷新照片
-    setInterval(loadPhotos, 8000);
+    // 自動每 4 秒刷新
+    setInterval(() => { loadPhotos(); loadDashboard(); }, 4000);
   }
 
   async function loadPhotos() {
@@ -155,17 +155,18 @@
         const time = new Date(p.submittedAt).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
         const badgeClass = p.status === 'approved' ? 'badge-approved' : p.status === 'rejected' ? 'badge-rejected' : 'badge-pending';
         const badgeText = p.status === 'approved' ? '✅ 已通過' : p.status === 'rejected' ? '❌ 未通過' : '⏳ 待審核';
+        const imgSrc = p.thumbUrl || p.photoUrl;
 
         return `<div class="photo-review-card">
-          <img src="${p.photoUrl}" alt="照片" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22150%22><text x=%2250%25%22 y=%2250%25%22 text-anchor=%22middle%22 dy=%22.3em%22 font-size=%2214%22>載入中...</text></svg>'">
+          <img src="${imgSrc}" alt="照片" loading="lazy" onerror="this.onerror=null;this.style.display='flex';this.style.alignItems='center';this.style.justifyContent='center';this.style.background='#f0f0f0';this.style.color='#999';this.style.fontSize='14px';this.alt='照片載入失敗';">
           <div class="photo-review-meta">
             <strong>${p.playerName}</strong> · ${teamLabel} · ${time}
             <span class="photo-status-badge ${badgeClass}" style="margin-left:8px;">${badgeText}</span>
           </div>
           ${p.status === 'pending' ? `
             <div class="photo-review-actions">
-              <button class="btn btn-primary btn-sm" onclick="verifyPhoto('${p.submissionId}', true)">✅ 通過 (+200分)</button>
-              <button class="btn btn-outline btn-sm" style="color:#f44336;border-color:#f44336;" onclick="verifyPhoto('${p.submissionId}', false)">❌ 不通過</button>
+              <button class="btn btn-primary btn-sm" id="approve-${p.submissionId}" onclick="verifyPhoto('${p.submissionId}', true, this)">✅ 通過 (+200分)</button>
+              <button class="btn btn-outline btn-sm" id="reject-${p.submissionId}" style="color:#f44336;border-color:#f44336;" onclick="verifyPhoto('${p.submissionId}', false, this)">❌ 不通過</button>
             </div>` : ''}
         </div>`;
       }).join('');
@@ -174,15 +175,26 @@
     }
   }
 
-  async function verifyPhoto(submissionId, approved) {
+  async function verifyPhoto(submissionId, approved, btn) {
     const action = approved ? '通過' : '拒絕';
     if (!confirm(`確定${action}這張照片？${approved ? '\n將立即加 200 分給該團隊' : '\n玩家將收到重拍通知'}`)) return;
+
+    // 禁用所有該照片的按鈕，防止重複點擊
+    const approveBtn = document.getElementById('approve-' + submissionId);
+    const rejectBtn = document.getElementById('reject-' + submissionId);
+    if (approveBtn) { approveBtn.disabled = true; approveBtn.textContent = '處理中...'; }
+    if (rejectBtn) { rejectBtn.disabled = true; }
+
     try {
       await API.post('ADMIN', { action: 'verifyPhoto', password: ADMIN_PWD, submissionId, approved });
       alert(`已${action}！${approved ? '積分已即時更新' : '玩家將看到重拍提示'}`);
       loadPhotos();
       loadDashboard();
-    } catch { alert('操作失敗'); }
+    } catch {
+      alert('操作失敗');
+      if (approveBtn) { approveBtn.disabled = false; approveBtn.textContent = '✅ 通過 (+200分)'; }
+      if (rejectBtn) { rejectBtn.disabled = false; }
+    }
   }
 
   async function loadDashboard() {
@@ -212,12 +224,24 @@
     const points = parseInt(document.getElementById('pointsAmount').value);
     const reason = document.getElementById('pointsReason').value.trim();
     if (!teamId || !points) { alert('請填寫完整'); return; }
+
+    const btn = document.getElementById('addPointsBtn');
+    btn.disabled = true;
+    btn.textContent = '提交中...';
+
     try {
       await API.post('ADMIN', { action: 'addManualPoints', password: ADMIN_PWD, teamId: parseInt(teamId), points, detail: reason });
       alert(`已加 ${points} 分！`);
       document.getElementById('pointsAmount').value = '';
       document.getElementById('pointsReason').value = '';
-    } catch { alert('加分失敗'); }
+      btn.textContent = '✅ 已送出';
+      // 3 秒後恢復
+      setTimeout(() => { btn.disabled = false; btn.textContent = '確認加分'; }, 3000);
+    } catch {
+      alert('加分失敗');
+      btn.disabled = false;
+      btn.textContent = '確認加分';
+    }
   }
 </script>
 </body>
